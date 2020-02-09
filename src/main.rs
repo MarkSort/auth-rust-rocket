@@ -100,7 +100,7 @@ fn post_tokens(token_spec: Json<TokenSpecification>, db: DbConnection) -> JsonRe
     let created: i32 = token.get("created");
     let last_active: i32 = token.get("last_active");
 
-    return JsonResponse {
+    JsonResponse {
         json: json!({
             "id": token_id,
             "token_secret": token_secret,
@@ -109,7 +109,7 @@ fn post_tokens(token_spec: Json<TokenSpecification>, db: DbConnection) -> JsonRe
             "last_active": last_active
         }),
         status: Status::Ok,
-    };
+    }
 }
 
 #[post("/", rank = 2)]
@@ -194,7 +194,7 @@ fn post_refresh_current_token(user: Identity, db: DbConnection) -> JsonResponse 
     let created: i32 = token.get("created");
     let last_active: i32 = token.get("last_active");
 
-    return JsonResponse {
+    JsonResponse {
         json: json!({
             "id": user.token_id,
             "lifetime": lifetime,
@@ -202,13 +202,11 @@ fn post_refresh_current_token(user: Identity, db: DbConnection) -> JsonResponse 
             "last_active": last_active
         }),
         status: Status::Ok,
-    };
+    }
 }
 
 #[get("/current/valid")]
-fn get_current_token_valid(_user: Identity) -> () {
-    ()
-}
+fn get_current_token_valid(_user: Identity) {}
 
 #[get("/<id>")]
 fn get_token(id: String, user: Identity, db: DbConnection) -> JsonResponse {
