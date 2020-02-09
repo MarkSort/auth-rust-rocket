@@ -24,6 +24,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "auth-rust-rocket"
+version = "0.1.0"
+dependencies = [
+ "rand 0.7.2",
+ "rocket",
+ "rocket_contrib",
+ "rust-argon2",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "autocfg"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -305,19 +318,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi",
-]
-
-[[package]]
-name = "hello-rocket"
-version = "0.1.0"
-dependencies = [
- "rand 0.7.2",
- "rocket",
- "rocket_contrib",
- "rust-argon2",
- "serde",
- "serde_derive",
- "serde_json",
 ]
 
 [[package]]
