@@ -1,15 +1,18 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
-#[macro_use] extern crate rocket;
-#[macro_use] extern crate rocket_contrib;
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate rocket;
+#[macro_use]
+extern crate rocket_contrib;
+#[macro_use]
+extern crate serde_derive;
 extern crate argon2;
 extern crate rand;
 
 use rocket::http::{ContentType, Status};
-use rocket::Outcome;
-use rocket::request::{self, Request, FromRequest};
+use rocket::request::{self, FromRequest, Request};
 use rocket::response::{self, content, Responder, Response};
+use rocket::Outcome;
 use rocket_contrib::databases::postgres;
 use rocket_contrib::json::{Json, JsonValue};
 
@@ -19,7 +22,7 @@ struct DbConnection(postgres::Connection);
 #[derive(Debug)]
 struct JsonResponse {
     json: JsonValue,
-    status: Status
+    status: Status,
 }
 
 impl<'r> Responder<'r> for JsonResponse {
@@ -35,29 +38,33 @@ impl<'r> Responder<'r> for JsonResponse {
 struct TokenSpecification {
     email: String,
     password: String,
-    lifetime: String
+    lifetime: String,
 }
 
 #[post("/", format = "json", data = "<token_spec>")]
 fn post_tokens(token_spec: Json<TokenSpecification>, db: DbConnection) -> JsonResponse {
-    if 
-        token_spec.0.lifetime != "until-idle" &&
-        token_spec.0.lifetime != "remember-me" &&
-        token_spec.0.lifetime != "no-expiration"
+    if token_spec.0.lifetime != "until-idle"
+        && token_spec.0.lifetime != "remember-me"
+        && token_spec.0.lifetime != "no-expiration"
     {
         return JsonResponse {
             json: json!({"error":"`lifetime` must be 'until-idle', 'remember-me', or 'no-expiration'"}),
-            status: Status::BadRequest
-        }
+            status: Status::BadRequest,
+        };
     }
 
     // get user record for the e-mail
-    let rows = db.query("SELECT id, password FROM identity WHERE email = $1", &[&token_spec.0.email]).unwrap();
+    let rows = db
+        .query(
+            "SELECT id, password FROM identity WHERE email = $1",
+            &[&token_spec.0.email],
+        )
+        .unwrap();
     if rows.len() != 1 {
         return JsonResponse {
             json: json!({"error":"email not found or password invalid"}),
-            status: Status::BadRequest
-        }
+            status: Status::BadRequest,
+        };
     }
     let user = rows.get(0);
 
@@ -68,20 +75,26 @@ fn post_tokens(token_spec: Json<TokenSpecification>, db: DbConnection) -> JsonRe
     if !matches {
         return JsonResponse {
             json: json!({"error":"email not found or password invalid"}),
-            status: Status::BadRequest
-        }
+            status: Status::BadRequest,
+        };
     }
 
     // create a token
     let user_id: i32 = user.get("id");
     let token_id = format!("{:0>32x}", rand::random::<u128>());
-    let token_secret = format!("{:0>32x}{:0>32x}", rand::random::<u128>(), rand::random::<u128>());
-    let rows = db.query(
-        "INSERT INTO token VALUES ($1, $2, $3, $4, now(), now()) \
+    let token_secret = format!(
+        "{:0>32x}{:0>32x}",
+        rand::random::<u128>(),
+        rand::random::<u128>()
+    );
+    let rows = db
+        .query(
+            "INSERT INTO token VALUES ($1, $2, $3, $4, now(), now()) \
             RETURNING cast(extract(epoch from created) as integer) created, \
                       cast(extract(epoch from last_active) as integer) last_active",
-        &[&token_id, &user_id, &token_secret, &token_spec.0.lifetime]
-    ).unwrap();
+            &[&token_id, &user_id, &token_secret, &token_spec.0.lifetime],
+        )
+        .unwrap();
 
     let token = rows.get(0);
     let created: i32 = token.get("created");
@@ -95,29 +108,28 @@ fn post_tokens(token_spec: Json<TokenSpecification>, db: DbConnection) -> JsonRe
             "created": created,
             "last_active": last_active
         }),
-        status: Status::Ok
-    }
+        status: Status::Ok,
+    };
 }
 
 #[post("/", rank = 2)]
 fn post_tokens_bad_content_type() -> JsonResponse {
     JsonResponse {
         json: json!({"error":"content-type must be application/json"}),
-        status: Status::UnsupportedMediaType
+        status: Status::UnsupportedMediaType,
     }
 }
-
 
 #[derive(Serialize)]
 struct Identity {
     id: i32,
-    token_id: String
+    token_id: String,
 }
 
 #[derive(Debug)]
 enum IdentityError {
     TokenMissing,
-    TokenInvalid
+    TokenInvalid,
 }
 
 impl<'a, 'r> FromRequest<'a, 'r> for Identity {
@@ -127,25 +139,29 @@ impl<'a, 'r> FromRequest<'a, 'r> for Identity {
         let cookies = request.cookies();
         let token = match cookies.get("token") {
             Some(x) => x.value(),
-            None => return Outcome::Failure((Status::Unauthorized, IdentityError::TokenMissing))
+            None => return Outcome::Failure((Status::Unauthorized, IdentityError::TokenMissing)),
         };
 
         let db = request.guard::<DbConnection>().unwrap();
-        let rows = db.query(
-            "SELECT id, identity_id FROM token_active WHERE secret = $1",
-            &[&token]
-        ).unwrap();
+        let rows = db
+            .query(
+                "SELECT id, identity_id FROM token_active WHERE secret = $1",
+                &[&token],
+            )
+            .unwrap();
         if rows.len() != 1 {
-            return Outcome::Failure((Status::Unauthorized, IdentityError::TokenInvalid))
+            return Outcome::Failure((Status::Unauthorized, IdentityError::TokenInvalid));
         }
         let token = rows.get(0);
         let user_id: i32 = token.get("identity_id");
         let token_id: String = token.get("id");
 
-        Outcome::Success(Identity{id: user_id, token_id})
+        Outcome::Success(Identity {
+            id: user_id,
+            token_id,
+        })
     }
 }
-
 
 #[get("/current")]
 fn get_current_token(user: Identity, db: DbConnection) -> JsonResponse {
@@ -154,18 +170,24 @@ fn get_current_token(user: Identity, db: DbConnection) -> JsonResponse {
 
 #[delete("/current")]
 fn delete_current_token(user: Identity, db: DbConnection) -> JsonResponse {
-    db.execute("DELETE FROM token WHERE id = $1", &[&user.token_id]).unwrap();
+    db.execute("DELETE FROM token WHERE id = $1", &[&user.token_id])
+        .unwrap();
     JsonResponse {
         json: json!({"success":"the token used to make this request was deleted"}),
-        status: Status::Ok
+        status: Status::Ok,
     }
 }
 
 #[post("/current/refresh")]
 fn post_refresh_current_token(user: Identity, db: DbConnection) -> JsonResponse {
-    let rows = db.query("UPDATE token SET last_active = now() WHERE id = $1 \
+    let rows = db
+        .query(
+            "UPDATE token SET last_active = now() WHERE id = $1 \
         RETURNING lifetime, cast(extract(epoch from created) as integer) created, \
-        cast(extract(epoch from last_active) as integer) last_active", &[&user.token_id]).unwrap();
+        cast(extract(epoch from last_active) as integer) last_active",
+            &[&user.token_id],
+        )
+        .unwrap();
 
     let token = rows.get(0);
     let lifetime: String = token.get("lifetime");
@@ -179,8 +201,8 @@ fn post_refresh_current_token(user: Identity, db: DbConnection) -> JsonResponse 
             "created": created,
             "last_active": last_active
         }),
-        status: Status::Ok
-    }
+        status: Status::Ok,
+    };
 }
 
 #[get("/current/valid")]
@@ -198,36 +220,40 @@ fn delete_token(id: String, user: Identity, db: DbConnection) -> JsonResponse {
     if id == user.token_id {
         return JsonResponse {
             json: json!({"error": "to delete current token, use the /tokens/current endpoint"}),
-            status: Status::BadRequest
-        }
+            status: Status::BadRequest,
+        };
     }
 
-    let rows_deleted = db.execute(
-        "DELETE FROM token_active WHERE id = $1 AND identity_id=$2",
-        &[&id, &user.id]
-    ).unwrap();
+    let rows_deleted = db
+        .execute(
+            "DELETE FROM token_active WHERE id = $1 AND identity_id=$2",
+            &[&id, &user.id],
+        )
+        .unwrap();
 
     if rows_deleted < 1 {
         return JsonResponse {
             json: json!({"error": "invalid or expired token id"}),
-            status: Status::NotFound
-        }
+            status: Status::NotFound,
+        };
     }
 
     JsonResponse {
         json: json!({"success": "the token was deleted"}),
-        status: Status::Ok
+        status: Status::Ok,
     }
 }
 
 #[get("/")]
 fn get_tokens(user: Identity, db: DbConnection) -> JsonResponse {
-    let rows = db.query(
-        "SELECT id, lifetime, cast(extract(epoch from created) as integer) created, \
+    let rows = db
+        .query(
+            "SELECT id, lifetime, cast(extract(epoch from created) as integer) created, \
                 cast(extract(epoch from last_active) as integer) last_active FROM token_active \
             WHERE identity_id = $1",
-        &[&user.id]
-    ).unwrap();
+            &[&user.id],
+        )
+        .unwrap();
 
     let tokens: Vec<JsonValue> = rows.iter().map(
         |token| {
@@ -241,10 +267,9 @@ fn get_tokens(user: Identity, db: DbConnection) -> JsonResponse {
 
     JsonResponse {
         json: json!({"user_id": user.id, "tokens": tokens}),
-        status: Status::Ok
+        status: Status::Ok,
     }
 }
-
 
 #[catch(400)]
 fn bad_request() -> content::Json<&'static str> {
@@ -271,19 +296,20 @@ fn internal_server_error() -> content::Json<&'static str> {
     content::Json("{\"error\":\"internal server error\"}")
 }
 
-
 fn query_token(token_id: String, user_id: i32, db: DbConnection) -> JsonResponse {
-    let rows = db.query(
-        "SELECT lifetime, cast(extract(epoch from created) as integer) created, \
+    let rows = db
+        .query(
+            "SELECT lifetime, cast(extract(epoch from created) as integer) created, \
                 cast(extract(epoch from last_active) as integer) last_active \
             FROM token_active WHERE id = $1 AND identity_id = $2",
-        &[&token_id, &user_id]
-    ).unwrap();
+            &[&token_id, &user_id],
+        )
+        .unwrap();
     if rows.len() != 1 {
         return JsonResponse {
             json: json!({"error": "invalid or expired token id"}),
-            status: Status::NotFound
-        }
+            status: Status::NotFound,
+        };
     }
     let other_token = rows.get(0);
     let lifetime: String = other_token.get("lifetime");
@@ -298,25 +324,27 @@ fn query_token(token_id: String, user_id: i32, db: DbConnection) -> JsonResponse
             "created": created,
             "last_active": last_active
         }),
-        status: Status::Ok
+        status: Status::Ok,
     }
 }
-
 
 fn main() {
     rocket::ignite()
         .attach(DbConnection::fairing())
-        .mount("/tokens", routes![
-            get_tokens,
-            post_tokens,
-            post_tokens_bad_content_type,
-            get_current_token,
-            delete_current_token,
-            post_refresh_current_token,
-            get_current_token_valid,
-            get_token,
-            delete_token
-        ])
+        .mount(
+            "/tokens",
+            routes![
+                get_tokens,
+                post_tokens,
+                post_tokens_bad_content_type,
+                get_current_token,
+                delete_current_token,
+                post_refresh_current_token,
+                get_current_token_valid,
+                get_token,
+                delete_token
+            ],
+        )
         .register(catchers![
             bad_request,
             unauthorized,
