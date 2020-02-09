@@ -1,0 +1,20 @@
+[package]
+name = "hello-rocket"
+version = "0.1.0"
+authors = ["Mark Achee <mark@achee.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.7.2"
+rocket = "0.4.2"
+rust-argon2 = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_derive = "1.0"
+serde_json = "1.0"
+
+[dependencies.rocket_contrib]
+version = "0.4.2"
+default-features = false
+features = ["json", "postgres_pool"]
