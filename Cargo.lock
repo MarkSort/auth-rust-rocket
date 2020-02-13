@@ -176,10 +176,11 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.6.6"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04973fa96e96579258a5091af6003abde64af786b860f18622b82e026cca60e6"
+checksum = "ce446db02cdc3165b94ae73111e570793400d0794e46125cc4056c81cbb039f4"
 dependencies = [
+ "autocfg",
  "cfg-if",
  "lazy_static",
 ]
@@ -978,9 +979,9 @@ dependencies = [
 
 [[package]]
 name = "rust-argon2"
-version = "0.6.1"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "416f5109bdd413cec4f04c029297838e7604c993f8d1483b1d438f23bdc3eb35"
+checksum = "13d93898abbc08f4122732299b5cc3e81052c18c6218045eba4a80e02a086a42"
 dependencies = [
  "base64 0.11.0",
  "blake2b_simd",
