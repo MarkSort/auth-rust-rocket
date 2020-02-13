@@ -14,6 +14,8 @@ CREATE TABLE identity (
 ALTER TABLE ONLY identity
     ADD CONSTRAINT identity_pkey PRIMARY KEY (id);
 
+CREATE UNIQUE INDEX identity_email_unique_index ON identity (email);
+
 CREATE SEQUENCE identity_id_seq
     AS integer
     START WITH 1
