@@ -269,6 +269,62 @@ fn get_tokens(user: Identity, db: DbConnection) -> JsonResponse {
     }
 }
 
+#[derive(Deserialize)]
+struct IdentitySpecification {
+    email: String,
+    password: String,
+}
+
+#[post("/", format = "json", data = "<user_spec>")]
+fn post_users(
+    user_spec: Json<IdentitySpecification>,
+    db: DbConnection,
+) -> Result<JsonResponse, postgres::error::Error> {
+    // just length limit for "email", maybe some regex eventually
+    if user_spec.email.len() > 150 {
+        return Ok(JsonResponse {
+            json: json!({"error": "`email` must be 150 characters or less"}),
+            status: Status::BadRequest,
+        });
+    }
+
+    // I have no idea if this is a good way to generate a salt
+    let salt = rand::random::<u128>();
+
+    let config = argon2::Config::default();
+    let password_hash =
+        argon2::hash_encoded(user_spec.password.as_bytes(), &salt.to_be_bytes(), &config).unwrap();
+
+    let result = db.query(
+        "INSERT INTO identity VALUES (default, $1, $2) RETURNING id",
+        &[&user_spec.email, &password_hash],
+    );
+
+    match result {
+        Ok(rows) => {
+            let id: i32 = rows.get(0).get("id");
+
+            Ok(JsonResponse {
+                json: json!({"id": id, "email": user_spec.email}),
+                status: Status::Ok,
+            })
+        }
+        Err(e) => match e.as_db() {
+            Some(db_error) => {
+                if db_error.code == postgres::error::UNIQUE_VIOLATION {
+                    return Ok(JsonResponse {
+                        json: json!({"error": "`email` is already in use"}),
+                        status: Status::BadRequest,
+                    });
+                };
+
+                Err(e)
+            }
+            _ => Err(e),
+        },
+    }
+}
+
 #[catch(400)]
 fn bad_request() -> content::Json<&'static str> {
     content::Json("{\"error\":\"bad request\"}")
@@ -343,6 +399,7 @@ fn main() {
                 delete_token
             ],
         )
+        .mount("/users", routes![post_users])
         .register(catchers![
             bad_request,
             unauthorized,
